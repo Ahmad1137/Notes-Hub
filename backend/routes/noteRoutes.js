@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const router = express.Router();
 const Note = require("../models/Note");
 const Comment = require("../models/Comment");
@@ -99,6 +100,9 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ----------------- GET public notes (no auth) -----------------
+// server/routes/notes.js
+
 // ----------------- My notes -----------------
 router.get("/my-notes", authMiddleware, async (req, res) => {
   try {
@@ -160,6 +164,18 @@ router.get("/search", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.get("/public", async (req, res) => {
+  try {
+    const notes = await Note.find({ visibility: "public" })
+      .populate("uploadedBy", "name") // assuming uploadedBy is a user ID
+      .sort({ createdAt: -1 });
+
+    res.json(notes);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching public notes" });
+  }
+});
 // ----------------- GET single note -----------------
 router.get("/:id", async (req, res) => {
   try {
@@ -185,134 +201,227 @@ router.get("/:id", async (req, res) => {
 });
 
 // ----------------- Upload route (JSON fileUrl) -----------------
-router.post("/upload", authMiddleware, async (req, res) => {
-  try {
-    const { title, fileUrl, subject, university, tags, visibility } = req.body;
-    if (!title || !fileUrl || !subject || !university) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be filled" });
-    }
+// router.post("/upload", authMiddleware, async (req, res) => {
+//   try {
+//     const { title, fileUrl, subject, university, tags, visibility } = req.body;
+//     if (!title || !fileUrl || !subject || !university) {
+//       return res
+//         .status(400)
+//         .json({ message: "All required fields must be filled" });
+//     }
 
-    // per-user daily limit: e.g., 20 notes/day
-    const dailyLimit = 20;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const countToday = await Note.countDocuments({
-      uploadedBy: req.user.userId,
-      createdAt: { $gte: today, $lt: tomorrow },
-    });
-    if (countToday >= dailyLimit) {
-      return res
-        .status(429)
-        .json({ message: `Daily upload limit reached (${dailyLimit})` });
-    }
+//     // per-user daily limit: e.g., 20 notes/day
+//     const dailyLimit = 20;
+//     const today = new Date();
+//     today.setHours(0, 0, 0, 0);
+//     const tomorrow = new Date(today);
+//     tomorrow.setDate(today.getDate() + 1);
+//     const countToday = await Note.countDocuments({
+//       uploadedBy: req.user.userId,
+//       createdAt: { $gte: today, $lt: tomorrow },
+//     });
+//     if (countToday >= dailyLimit) {
+//       return res
+//         .status(429)
+//         .json({ message: `Daily upload limit reached (${dailyLimit})` });
+//     }
 
-    const note = new Note({
-      title,
-      fileUrl,
-      subject,
-      university,
-      tags: tags
-        ? Array.isArray(tags)
-          ? tags
-          : tags.split(",").map((t) => t.trim())
-        : [],
-      visibility: visibility || "public",
-      uploadedBy: req.user.userId,
-    });
+//     const note = new Note({
+//       title,
+//       fileUrl,
+//       subject,
+//       university,
+//       tags: tags
+//         ? Array.isArray(tags)
+//           ? tags
+//           : tags.split(",").map((t) => t.trim())
+//         : [],
+//       visibility: visibility || "public",
+//       uploadedBy: req.user.userId,
+//     });
 
-    await note.save();
-    res.status(201).json({ message: "Note uploaded successfully", note });
-  } catch (error) {
-    console.error("Upload Note Error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     await note.save();
+//     res.status(201).json({ message: "Note uploaded successfully", note });
+//   } catch (error) {
+//     console.error("Upload Note Error:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
-// ----------------- Upload file route (multipart/form-data, stores file locally) -----------------
+// // ----------------- Upload file route (multipart/form-data, stores file locally) -----------------
+// router.post(
+//   "/upload-file",
+//   authMiddleware,
+//   upload.single("file"),
+//   async (req, res) => {
+//     try {
+//       if (!req.file)
+//         return res.status(400).json({ message: "PDF file is required" });
+
+//       const { title, subject, university, tags, visibility } = req.body;
+//       if (!title || !subject || !university) {
+//         return res
+//           .status(400)
+//           .json({ message: "title, subject, university are required" });
+//       }
+
+//       // per-user daily limit check (same as above)
+//       const dailyLimit = 20;
+//       const today = new Date();
+//       today.setHours(0, 0, 0, 0);
+//       const tomorrow = new Date(today);
+//       tomorrow.setDate(today.getDate() + 1);
+//       const countToday = await Note.countDocuments({
+//         uploadedBy: req.user.userId,
+//         createdAt: { $gte: today, $lt: tomorrow },
+//       });
+//       if (countToday >= dailyLimit) {
+//         // delete file if limit exceeded
+//         return res
+//           .status(429)
+//           .json({ message: `Daily upload limit reached (${dailyLimit})` });
+//       }
+
+//       const fileUrl = req.file.filename; // you serve via express.static('uploads')
+//       const note = new Note({
+//         title,
+//         fileUrl: `/uploads/${fileUrl}`, // store accessible path or just filename depending on frontend
+//         subject,
+//         university,
+//         tags: tags ? tags.split(",").map((t) => t.trim()) : [],
+//         visibility: visibility || "public",
+//         uploadedBy: req.user.userId,
+//       });
+
+//       await note.save();
+//       res.status(201).json({ message: "File uploaded and note saved", note });
+//     } catch (err) {
+//       console.error("Upload-file Error:", err);
+//       res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+
 router.post(
-  "/upload-file",
+  "/upload",
   authMiddleware,
-  upload.single("file"),
+  upload.single("file"), // will handle if file is uploaded; else req.file is undefined
   async (req, res) => {
     try {
-      if (!req.file)
-        return res.status(400).json({ message: "PDF file is required" });
+      let { title, fileUrl, subject, university, tags, visibility } = req.body;
 
-      const { title, subject, university, tags, visibility } = req.body;
-      if (!title || !subject || !university) {
-        return res
-          .status(400)
-          .json({ message: "title, subject, university are required" });
+      // If a file is uploaded, override fileUrl with uploaded file path
+      if (req.file) {
+        fileUrl = `/uploads/${req.file.filename}`;
       }
 
-      // per-user daily limit check (same as above)
+      // Validate required fields
+      if (!title || !fileUrl || !subject || !university) {
+        return res.status(400).json({
+          message:
+            "All required fields (title, fileUrl, subject, university) must be filled",
+        });
+      }
+
+      // per-user daily limit check
       const dailyLimit = 20;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
+
       const countToday = await Note.countDocuments({
         uploadedBy: req.user.userId,
         createdAt: { $gte: today, $lt: tomorrow },
       });
       if (countToday >= dailyLimit) {
-        // delete file if limit exceeded
+        // If file was uploaded but limit reached, optionally delete file from disk here
         return res
           .status(429)
           .json({ message: `Daily upload limit reached (${dailyLimit})` });
       }
 
-      const fileUrl = req.file.filename; // you serve via express.static('uploads')
+      // Prepare tags array
+      tags = tags
+        ? Array.isArray(tags)
+          ? tags
+          : tags.split(",").map((t) => t.trim())
+        : [];
+
       const note = new Note({
         title,
-        fileUrl: `/uploads/${fileUrl}`, // store accessible path or just filename depending on frontend
+        fileUrl,
         subject,
         university,
-        tags: tags ? tags.split(",").map((t) => t.trim()) : [],
+        tags,
         visibility: visibility || "public",
         uploadedBy: req.user.userId,
       });
 
       await note.save();
-      res.status(201).json({ message: "File uploaded and note saved", note });
-    } catch (err) {
-      console.error("Upload-file Error:", err);
+
+      res.status(201).json({ message: "Note uploaded successfully", note });
+    } catch (error) {
+      console.error("Upload Note Error:", error);
       res.status(500).json({ message: "Server error" });
     }
   }
 );
 
 // ----------------- EDIT NOTE -----------------
-router.put("/:id", authMiddleware, async (req, res) => {
+router.put("/:id", authMiddleware, upload.single("file"), async (req, res) => {
   try {
     const note = await Note.findById(req.params.id);
     if (!note) return res.status(404).json({ message: "Note not found" });
     if (note.uploadedBy.toString() !== req.user.userId)
       return res.status(403).json({ message: "You cannot edit this note" });
 
-    const {
-      title,
-      fileUrl,
-      subject,
-      university,
-      tags,
-      visibility,
-      commentsEnabled,
-    } = req.body;
+    // Destructure from req.body (text fields)
+    const { title, subject, university, tags, visibility, commentsEnabled } =
+      req.body;
+
+    // Update text fields if provided
     note.title = title || note.title;
-    note.fileUrl = fileUrl || note.fileUrl;
     note.subject = subject || note.subject;
     note.university = university || note.university;
-    note.tags = tags || note.tags;
     note.visibility = visibility || note.visibility;
     if (typeof commentsEnabled === "boolean")
       note.commentsEnabled = commentsEnabled;
 
+    // Parse tags if provided as string
+    if (tags) {
+      note.tags = Array.isArray(tags)
+        ? tags
+        : tags.split(",").map((t) => t.trim());
+    }
+
+    // Handle file upload and update fileUrl
+    if (req.file) {
+      // Delete old file safely if exists
+      if (note.fileUrl) {
+        const oldFilePath = path.join(
+          __dirname,
+          "../uploads",
+          path.basename(note.fileUrl)
+        );
+        fs.access(oldFilePath, fs.constants.F_OK, (err) => {
+          if (!err) {
+            fs.unlink(oldFilePath, (err) => {
+              if (err) console.error("Failed to delete old file:", err);
+            });
+          }
+        });
+      }
+
+      // Update note.fileUrl to new file path
+      note.fileUrl = `/uploads/${req.file.filename}`;
+    } else if (req.body.fileUrl) {
+      // Optional: If frontend wants to update fileUrl without upload
+      note.fileUrl = req.body.fileUrl;
+    }
+
     await note.save();
+
     res.json({ message: "Note updated", note });
   } catch (err) {
     console.error("Edit Note Error:", err);

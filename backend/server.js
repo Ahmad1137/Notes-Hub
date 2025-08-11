@@ -10,7 +10,7 @@ const app = express();
 // ================== Middlewares ==================
 app.use(cors());
 app.use(express.json());
-app.use(express.static("uploads")); // serve PDFs/images
+app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // serve PDFs/images
 
 // Rate limiter: 200 requests per 15 min per IP
 const apiLimiter = rateLimit({

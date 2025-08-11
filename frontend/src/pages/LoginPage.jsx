@@ -2,6 +2,7 @@ import React, { useState, useContext } from "react";
 import { loginUser } from "../services/api";
 import { AuthContext } from "../contexts/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
+import "../index.css"; // Ensure Tailwind CSS is imported
 
 const LoginPage = () => {
   const [form, setForm] = useState({ email: "", password: "" });

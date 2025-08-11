@@ -1,103 +1,100 @@
-import React, { useEffect, useState, useContext } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { Link } from "react-router-dom";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import Layout from "../components/Layout";
+import { getPublicNotes } from "../services/api";
+import {
+  FaFilePdf,
+  FaUser,
+  FaTags,
+  FaUniversity,
+  FaThumbsUp,
+  FaThumbsDown,
+} from "react-icons/fa";
 
 export default function Notes() {
-  const { user } = useContext(AuthContext);
   const [notes, setNotes] = useState([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     fetchNotes();
-  }, [search, filter]);
-
+  }, []);
+  const BACKEND_URL = "http://localhost:5000";
   const fetchNotes = async () => {
     try {
-      const res = await axios.get(`/api/notes`, {
-        params: { search, filter },
-      });
-      setNotes(res.data);
+      const res = await getPublicNotes();
+      setNotes(Array.isArray(res.data) ? res.data : res.data.data || []);
     } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const deleteNote = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this note?")) return;
-    try {
-      await axios.delete(`/api/notes/${id}`, {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      setNotes(notes.filter((n) => n._id !== id));
-    } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch notes:", err);
+      setNotes([]);
     }
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Notes</h1>
+    <Layout>
+      <div className="p-6 max-w-7xl mx-auto">
+        <h1 className="text-4xl font-extrabold mb-8 text-center text-indigo-700">
+          All Notes
+        </h1>
 
-      {/* Search + Filter */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Search notes..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 border rounded px-4 py-2"
-        />
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="border rounded px-4 py-2"
-        >
-          <option value="">All</option>
-          <option value="public">Public</option>
-          <option value="private">Private</option>
-        </select>
-      </div>
-
-      {/* Notes Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {notes.map((note) => (
-          <div
-            key={note._id}
-            className="border rounded-lg shadow p-4 bg-white flex flex-col"
-          >
-            <h2 className="text-xl font-semibold mb-2">{note.title}</h2>
-            <p className="text-gray-600 flex-1">{note.description}</p>
-
-            <div className="mt-4 flex justify-between items-center">
-              <Link
-                to={`/notes/${note._id}`}
-                className="text-blue-500 hover:underline"
+        {notes.length === 0 ? (
+          <p className="text-center text-gray-500 text-lg mt-12">
+            No notes found.
+          </p>
+        ) : (
+          <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {notes.map((note) => (
+              <div
+                key={note._id}
+                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 flex flex-col"
               >
-                View
-              </Link>
+                <h2 className="text-2xl font-semibold mb-3 text-indigo-800">
+                  {note.title}
+                </h2>
 
-              {user && user.id === note.userId && (
-                <div className="flex gap-2">
-                  <Link
-                    to={`/notes/edit/${note._id}`}
-                    className="bg-yellow-400 px-2 py-1 rounded text-sm"
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => deleteNote(note._id)}
-                    className="bg-red-500 text-white px-2 py-1 rounded text-sm"
-                  >
-                    Delete
-                  </button>
+                <div className="flex items-center text-gray-600 mb-2 space-x-2">
+                  <FaUniversity className="text-indigo-500" />
+                  <span className="font-medium">
+                    {note.university || "N/A"}
+                  </span>
                 </div>
-              )}
-            </div>
+
+                <div className="flex items-center text-gray-600 mb-2 space-x-2">
+                  <FaTags className="text-indigo-500" />
+                  <span>{note.tags?.join(", ") || "N/A"}</span>
+                </div>
+
+                <div className="flex items-center text-gray-600 mb-2 space-x-2">
+                  <FaUser className="text-indigo-500" />
+                  <span>Uploaded by: {note.uploadedBy?.name || "Unknown"}</span>
+                </div>
+
+                <p className="text-gray-500 text-sm mb-4">
+                  Visibility:{" "}
+                  <span className="capitalize">{note.visibility}</span>
+                </p>
+
+                <div className="flex space-x-4 text-gray-600 mb-4">
+                  <div className="flex items-center space-x-1">
+                    <FaThumbsUp className="text-green-500" />
+                    <span>{note.upvotes}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <FaThumbsDown className="text-red-500" />
+                    <span>{note.downvotes}</span>
+                  </div>
+                </div>
+
+                <a
+                  href={`${BACKEND_URL}${note.fileUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-auto inline-flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition"
+                >
+                  <FaFilePdf className="mr-2" /> View PDF
+                </a>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    </div>
+    </Layout>
   );
 }

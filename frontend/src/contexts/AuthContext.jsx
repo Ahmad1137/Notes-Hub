@@ -1,11 +1,11 @@
-import React, { createContext, useState, useEffect } from "react";
+// In src/contexts/AuthContext.jsx
+import React, { createContext, useState, useEffect, useContext } from "react";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  // Load user from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
@@ -31,4 +31,9 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+// ✅ This is the hook your Navbar is trying to import
+export const useAuth = () => {
+  return useContext(AuthContext);
 };

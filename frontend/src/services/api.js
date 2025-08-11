@@ -15,7 +15,9 @@ export const registerUser = (data) => API.post("/auth/register", data);
 
 // Notes
 export const uploadNote = (data) => API.post("/notes/upload", data);
+// export const uploadFile = (data) => API.post("/notes/upload-file", data);
 export const getAllNotes = () => API.get("/notes");
+export const getPublicNotes = () => API.get("/notes/public");
 export const getMyNotes = () => API.get("/notes/my-notes");
 export const getNotesById = (id) => API.get(`/notes/${id}`);
 export const editNote = (id, data) => API.put(`/notes/${id}`, data);

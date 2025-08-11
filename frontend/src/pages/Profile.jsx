@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
+import Layout from "../components/Layout"; // Assuming you have a Layout component
 
 const Profile = () => {
   const { user, token } = useAuth();
@@ -23,23 +24,25 @@ const Profile = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">My Profile</h1>
-      <form onSubmit={updateProfile} className="space-y-4">
-        <input
-          type="text"
-          className="border rounded w-full p-2"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          Save Changes
-        </button>
-      </form>
-    </div>
+    <Layout>
+      <div className="max-w-md mx-auto p-4">
+        <h1 className="text-2xl font-bold mb-4">My Profile</h1>
+        <form onSubmit={updateProfile} className="space-y-4">
+          <input
+            type="text"
+            className="border rounded w-full p-2"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+          >
+            Save Changes
+          </button>
+        </form>
+      </div>
+    </Layout>
   );
 };
 
