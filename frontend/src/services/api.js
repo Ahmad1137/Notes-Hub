@@ -12,6 +12,13 @@ API.interceptors.request.use((req) => {
 // Auth
 export const loginUser = (data) => API.post("/auth/login", data);
 export const registerUser = (data) => API.post("/auth/register", data);
+//profiles
+// Profile
+export const getProfile = () => API.get("/auth/profile");
+export const updateProfile = (formData) =>
+  API.put("/auth/profile", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
 // Notes
 export const uploadNote = (data) => API.post("/notes/upload", data);

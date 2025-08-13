@@ -10,7 +10,7 @@ const router = express.Router();
 
 // ================== Multer Storage for Profile Pics ==================
 const profileStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/profile/"),
+  destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) =>
     cb(null, Date.now() + path.extname(file.originalname)),
 });
@@ -99,7 +99,7 @@ router.put(
       user.address = address || user.address;
 
       if (req.file) {
-        user.profilePic = `/uploads/profile/${req.file.filename}`;
+        user.profilePic = `/uploads/${req.file.filename}`;
       }
 
       await user.save();
