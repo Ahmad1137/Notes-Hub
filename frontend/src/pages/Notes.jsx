@@ -6,6 +6,8 @@ import {
   Notesdownvote,
   createComment,
   getCommentsNotes,
+  createBookmark,
+  getBookmarks,
 } from "../services/api";
 import {
   FaFilePdf,
@@ -14,12 +16,15 @@ import {
   FaUniversity,
   FaThumbsUp,
   FaThumbsDown,
+  FaBookmark,
 } from "react-icons/fa";
 
 export default function Notes() {
   const [notes, setNotes] = useState([]);
-  const [comments, setComments] = useState({}); // store comments per noteId
-  const [newComment, setNewComment] = useState({}); // store draft comment per noteId
+  const [comments, setComments] = useState({});
+  const [showAllComments, setShowAllComments] = useState({});
+  const [newComment, setNewComment] = useState({});
+  const [bookmarkedNotes, setBookmarkedNotes] = useState([]); // ✅ store bookmarked note IDs
 
   const BACKEND_URL = "http://localhost:5000";
   const token = localStorage.getItem("token");
@@ -30,6 +35,9 @@ export default function Notes() {
 
   useEffect(() => {
     fetchNotes();
+    if (isLoggedIn) {
+      fetchBookmarks(); // ✅ also load bookmarks
+    }
   }, []);
 
   const fetchNotes = async () => {
@@ -40,7 +48,6 @@ export default function Notes() {
         : res.data.data || [];
       setNotes(fetchedNotes);
 
-      // Fetch comments for each note
       fetchedNotes.forEach(async (note) => {
         try {
           const { data } = await getCommentsNotes(note._id);
@@ -51,7 +58,6 @@ export default function Notes() {
             ...prev,
             [note._id]: commentsArray,
           }));
-          console.log("Fetched comments for note", note._id, commentsArray);
         } catch (err) {
           console.error("Error fetching comments for note", note._id, err);
         }
@@ -59,6 +65,18 @@ export default function Notes() {
     } catch (err) {
       console.error("Failed to fetch notes:", err);
       setNotes([]);
+    }
+  };
+
+  const fetchBookmarks = async () => {
+    try {
+      const { data } = await getBookmarks();
+      const bookmarkedIds = data.map(
+        (bookmark) => bookmark.note?._id || bookmark._id
+      );
+      setBookmarkedNotes(bookmarkedIds);
+    } catch (err) {
+      console.error("Failed to fetch bookmarks:", err);
     }
   };
 
@@ -73,7 +91,6 @@ export default function Notes() {
         ...prev,
         [noteId]: [...(prev[noteId] || []), newC],
       }));
-
       setNewComment((prev) => ({ ...prev, [noteId]: "" }));
     } catch (err) {
       console.error("Error adding comment:", err);
@@ -88,9 +105,19 @@ export default function Notes() {
       } else {
         await Notesdownvote(id);
       }
-      fetchNotes(); // refresh notes (and votes)
+      fetchNotes();
     } catch (err) {
       console.error("Voting error:", err);
+    }
+  };
+
+  const handleBookmark = async (noteId) => {
+    if (!isLoggedIn) return;
+    try {
+      await createBookmark(noteId, {});
+      fetchBookmarks(); // refresh bookmark list
+    } catch (err) {
+      console.error("Error bookmarking note:", err);
     }
   };
 
@@ -112,15 +139,29 @@ export default function Notes() {
                 (v) => v.user === currentUserId
               );
               const hasVoted = Boolean(userVote);
+              const isBookmarked = bookmarkedNotes.includes(note._id); // ✅ check bookmark status
 
               return (
                 <div
                   key={note._id}
                   className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 p-6 flex flex-col"
                 >
-                  <h2 className="text-2xl font-semibold mb-3 text-indigo-800">
-                    {note.title}
-                  </h2>
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-semibold mb-3 text-indigo-800">
+                      {note.title}
+                    </h2>
+                    {isLoggedIn && (
+                      <button
+                        onClick={() => handleBookmark(note._id)}
+                        className={`text-xl ${
+                          isBookmarked ? "text-green-500" : "text-gray-400"
+                        }`}
+                        title={isBookmarked ? "Bookmarked" : "Add Bookmark"}
+                      >
+                        <FaBookmark />
+                      </button>
+                    )}
+                  </div>
 
                   <div className="flex items-center text-gray-600 mb-2 space-x-2">
                     <FaUniversity className="text-indigo-500" />
@@ -171,53 +212,6 @@ export default function Notes() {
                     </button>
                   </div>
 
-                  {/* Comments */}
-                  <div className="mt-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">
-                      Comments
-                    </h3>
-                    <div className="space-y-1 mb-3 max-h-32 overflow-y-auto border p-2 rounded">
-                      {(comments[note._id] || []).length > 0 ? (
-                        comments[note._id].map((c) => (
-                          <div
-                            key={c._id || `${note._id}-${Math.random()}`}
-                            className="text-sm"
-                          >
-                            <strong>{c.user?.name || "Unknown"}:</strong>{" "}
-                            {c.text}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-sm">
-                          No comments yet.
-                        </p>
-                      )}
-                    </div>
-
-                    {isLoggedIn && (
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          placeholder="Write a comment..."
-                          value={newComment[note._id] || ""}
-                          onChange={(e) =>
-                            setNewComment((prev) => ({
-                              ...prev,
-                              [note._id]: e.target.value,
-                            }))
-                          }
-                          className="flex-1 border rounded px-2 py-1 text-sm"
-                        />
-                        <button
-                          onClick={() => handleAddComment(note._id)}
-                          className="bg-indigo-600 text-white px-3 py-1 rounded text-sm"
-                        >
-                          Post
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
                   <a
                     href={`${BACKEND_URL}${note.fileUrl}`}
                     target="_blank"
@@ -226,6 +220,94 @@ export default function Notes() {
                   >
                     <FaFilePdf className="mr-2" /> View PDF
                   </a>
+
+                  {/* Comments Section */}
+                  <div className="mt-6">
+                    <h3 className="text-lg font-bold mb-4">Comments</h3>
+
+                    {/* Add New Comment */}
+                    {isLoggedIn && (
+                      <div className="flex items-start space-x-3 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
+                          {JSON.parse(localStorage.getItem("user"))
+                            ?.name?.charAt(0)
+                            .toUpperCase() || "U"}
+                        </div>
+
+                        <div className="flex-1">
+                          <textarea
+                            value={newComment[note._id] || ""}
+                            onChange={(e) =>
+                              setNewComment({
+                                ...newComment,
+                                [note._id]: e.target.value,
+                              })
+                            }
+                            placeholder="Write a comment..."
+                            className="w-full p-2 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          />
+                          <button
+                            onClick={() => handleAddComment(note._id)}
+                            className="mt-2 px-4 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                          >
+                            Post
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comment List */}
+                    <div className="space-y-4">
+                      {comments[note._id]?.length > 0 ? (
+                        (showAllComments[note._id]
+                          ? comments[note._id] // all comments
+                          : comments[note._id].slice(-1)
+                        ) // latest only
+                          .map((c) => (
+                            <div
+                              key={c._id}
+                              className="flex items-start space-x-3"
+                            >
+                              <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-700 font-bold">
+                                {c.user?.name?.charAt(0).toUpperCase() || "U"}
+                              </div>
+                              <div className="bg-gray-100 p-3 rounded-xl flex-1">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-semibold">
+                                    {c.user?.name || "Unknown User"}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(c.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-gray-800">{c.text}</p>
+                              </div>
+                            </div>
+                          ))
+                      ) : (
+                        <p className="text-gray-500 text-sm">
+                          No comments yet. Be the first!
+                        </p>
+                      )}
+
+                      {/* Toggle Read more / Read less */}
+                      {comments[note._id]?.length > 1 && (
+                        <button
+                          onClick={() =>
+                            setShowAllComments((prev) => ({
+                              ...prev,
+                              [note._id]: !prev[note._id], // toggle
+                            }))
+                          }
+                          className="text-indigo-600 text-sm hover:underline"
+                        >
+                          {showAllComments[note._id]
+                            ? "Read less"
+                            : "Read more comments"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
