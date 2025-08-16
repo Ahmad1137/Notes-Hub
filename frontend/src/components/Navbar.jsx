@@ -57,13 +57,13 @@ export default function Navbar() {
                 <FaFileAlt className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900 font-display">
-                Student Notes Hub
+                Notes Hub
               </span>
             </Link>
           </div>
 
           {/* Search Bar - Desktop */}
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
+          <div className="hidden md:flex flex-1 max-w-md mx-2">
             <form onSubmit={handleSearch} className="relative w-full">
               <div
                 className={`relative ${
