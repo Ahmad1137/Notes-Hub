@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const multer = require("multer");
 const User = require("../models/User");
+const Note = require("../models/Note");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
@@ -121,5 +122,41 @@ router.put(
     }
   }
 );
+
+// ================== GET USER STATS ==================
+router.get("/stats", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get user's notes count
+    const myNotes = await Note.countDocuments({ uploadedBy: userId });
+
+    // Get total notes count (public + user's private)
+    const totalNotes = await Note.countDocuments({
+      $or: [{ visibility: "public" }, { uploadedBy: userId }],
+    });
+
+    // Get user's bookmarks count
+    const user = await User.findById(userId).populate("bookmarks");
+    const bookmarks = user.bookmarks ? user.bookmarks.length : 0;
+
+    // Get total views (sum of upvotes and downvotes for user's notes)
+    const userNotes = await Note.find({ uploadedBy: userId });
+    const totalViews = userNotes.reduce(
+      (sum, note) => sum + (note.upvotes || 0) + (note.downvotes || 0),
+      0
+    );
+
+    res.json({
+      totalNotes,
+      myNotes,
+      bookmarks,
+      totalViews,
+    });
+  } catch (err) {
+    console.error("Get User Stats Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 module.exports = router;

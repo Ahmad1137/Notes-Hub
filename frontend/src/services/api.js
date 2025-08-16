@@ -20,11 +20,14 @@ export const updateProfile = (formData) =>
     headers: { "Content-Type": "multipart/form-data" },
   });
 
+// User Stats
+export const getUserStats = () => API.get("/auth/stats");
+
 // Notes
 export const uploadNote = (data) => API.post("/notes/upload", data);
 // export const uploadFile = (data) => API.post("/notes/upload-file", data);
 export const getAllNotes = () => API.get("/notes");
-export const getPublicNotes = () => API.get("/notes/public");
+export const getPublicNotes = (params = {}) => API.get("/notes", { params });
 export const getMyNotes = () => API.get("/notes/my-notes");
 export const getNotesById = (id) => API.get(`/notes/${id}`);
 export const editNote = (id, data) => API.put(`/notes/${id}`, data);
@@ -36,5 +39,14 @@ export const createComment = (noteId, text) =>
 export const getCommentsNotes = (id) => API.get(`/notes/${id}/comments`);
 export const createBookmark = (id, data) =>
   API.post(`/notes/${id}/bookmark`, data);
+export const removeBookmark = (id) => API.delete(`/notes/${id}/bookmark`);
 export const getBookmarks = () => API.get("/notes/bookmarks/me");
-export const searchNotes = (query) => API.get(`/notes/search?q=${query}`);
+export const searchNotes = async (query) => {
+  try {
+    const res = await API.get("/notes/search", { params: query });
+    return res.data;
+  } catch (err) {
+    console.error("Search API Error:", err);
+    return [];
+  }
+};

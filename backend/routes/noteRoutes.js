@@ -122,42 +122,48 @@ router.get("/search", authMiddleware, async (req, res) => {
   try {
     const { keyword, subject, university, visibility } = req.query;
 
-    let query = {};
+    // Start with an $and array to combine all conditions
+    let query = { $and: [] };
 
-    // Visibility rules
+    // Step 1: Visibility rules
     if (visibility) {
-      query.visibility = visibility; // public/private
+      query.$and.push({ visibility });
     } else {
-      // If user not logged in, only show public notes
       if (!req.user) {
-        query.visibility = "public";
+        query.$and.push({ visibility: "public" });
       } else {
-        // Show public + user's own notes
-        query.$or = [{ visibility: "public" }, { uploadedBy: req.user.userId }];
+        query.$and.push({
+          $or: [{ visibility: "public" }, { uploadedBy: req.user.userId }],
+        });
       }
     }
 
-    // Keyword search
+    // Step 2: Keyword search
     if (keyword) {
-      query.$or = [
-        { title: { $regex: keyword, $options: "i" } },
-        { subject: { $regex: keyword, $options: "i" } },
-        { university: { $regex: keyword, $options: "i" } },
-        { tags: { $regex: keyword, $options: "i" } },
-      ];
+      query.$and.push({
+        $or: [
+          { title: { $regex: keyword, $options: "i" } },
+          { subject: { $regex: keyword, $options: "i" } },
+          { university: { $regex: keyword, $options: "i" } },
+          { tags: { $regex: keyword, $options: "i" } },
+        ],
+      });
     }
 
-    // Subject filter
+    // Step 3: Subject filter
     if (subject) {
-      query.subject = subject;
+      query.$and.push({ subject });
     }
 
-    // University filter
+    // Step 4: University filter
     if (university) {
-      query.university = university;
+      query.$and.push({ university });
     }
 
-    const notes = await Note.find(query).sort({ createdAt: -1 });
+    // If no filters at all, fallback to empty {}
+    const finalQuery = query.$and.length > 0 ? query : {};
+
+    const notes = await Note.find(finalQuery).sort({ createdAt: -1 });
     res.json(notes);
   } catch (error) {
     console.error("Search Notes Error:", error);
@@ -201,106 +207,6 @@ router.get("/:id", async (req, res) => {
 });
 
 // ----------------- Upload route (JSON fileUrl) -----------------
-// router.post("/upload", authMiddleware, async (req, res) => {
-//   try {
-//     const { title, fileUrl, subject, university, tags, visibility } = req.body;
-//     if (!title || !fileUrl || !subject || !university) {
-//       return res
-//         .status(400)
-//         .json({ message: "All required fields must be filled" });
-//     }
-
-//     // per-user daily limit: e.g., 20 notes/day
-//     const dailyLimit = 20;
-//     const today = new Date();
-//     today.setHours(0, 0, 0, 0);
-//     const tomorrow = new Date(today);
-//     tomorrow.setDate(today.getDate() + 1);
-//     const countToday = await Note.countDocuments({
-//       uploadedBy: req.user.userId,
-//       createdAt: { $gte: today, $lt: tomorrow },
-//     });
-//     if (countToday >= dailyLimit) {
-//       return res
-//         .status(429)
-//         .json({ message: `Daily upload limit reached (${dailyLimit})` });
-//     }
-
-//     const note = new Note({
-//       title,
-//       fileUrl,
-//       subject,
-//       university,
-//       tags: tags
-//         ? Array.isArray(tags)
-//           ? tags
-//           : tags.split(",").map((t) => t.trim())
-//         : [],
-//       visibility: visibility || "public",
-//       uploadedBy: req.user.userId,
-//     });
-
-//     await note.save();
-//     res.status(201).json({ message: "Note uploaded successfully", note });
-//   } catch (error) {
-//     console.error("Upload Note Error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
-
-// // ----------------- Upload file route (multipart/form-data, stores file locally) -----------------
-// router.post(
-//   "/upload-file",
-//   authMiddleware,
-//   upload.single("file"),
-//   async (req, res) => {
-//     try {
-//       if (!req.file)
-//         return res.status(400).json({ message: "PDF file is required" });
-
-//       const { title, subject, university, tags, visibility } = req.body;
-//       if (!title || !subject || !university) {
-//         return res
-//           .status(400)
-//           .json({ message: "title, subject, university are required" });
-//       }
-
-//       // per-user daily limit check (same as above)
-//       const dailyLimit = 20;
-//       const today = new Date();
-//       today.setHours(0, 0, 0, 0);
-//       const tomorrow = new Date(today);
-//       tomorrow.setDate(today.getDate() + 1);
-//       const countToday = await Note.countDocuments({
-//         uploadedBy: req.user.userId,
-//         createdAt: { $gte: today, $lt: tomorrow },
-//       });
-//       if (countToday >= dailyLimit) {
-//         // delete file if limit exceeded
-//         return res
-//           .status(429)
-//           .json({ message: `Daily upload limit reached (${dailyLimit})` });
-//       }
-
-//       const fileUrl = req.file.filename; // you serve via express.static('uploads')
-//       const note = new Note({
-//         title,
-//         fileUrl: `/uploads/${fileUrl}`, // store accessible path or just filename depending on frontend
-//         subject,
-//         university,
-//         tags: tags ? tags.split(",").map((t) => t.trim()) : [],
-//         visibility: visibility || "public",
-//         uploadedBy: req.user.userId,
-//       });
-
-//       await note.save();
-//       res.status(201).json({ message: "File uploaded and note saved", note });
-//     } catch (err) {
-//       console.error("Upload-file Error:", err);
-//       res.status(500).json({ message: "Server error" });
-//     }
-//   }
-// );
 
 router.post(
   "/upload",

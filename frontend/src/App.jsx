@@ -1,6 +1,8 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, AuthContext } from "./contexts/AuthContext";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import Dashboard from "./pages/Dashboard";
@@ -10,17 +12,27 @@ import NoteDetail from "./pages/NoteDetail";
 import MyNotes from "./pages/MyNotes";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import SearchResults from "./pages/SearchResults";
+import Bookmarks from "./pages/Bookmarks";
+import Analytics from "./pages/Analytics";
 import "./index.css"; // Ensure you have this import for Tailwind CSS
 
 // ProtectedRoute wrapper
 const ProtectedRoute = ({ children }) => {
-  const { user } = React.useContext(AuthContext);
+  const { user, loading } = React.useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
+    );
+    // or your spinner
+  }
+
   if (!user) return <Navigate to="/login" />;
-  return (
-    <>
-      <div className="min-h-screen bg-gray-50">{children}</div>
-    </>
-  );
+
+  return <div className="min-h-screen bg-gray-50">{children}</div>;
 };
 
 const App = () => (
@@ -65,6 +77,22 @@ const App = () => (
           }
         />
         <Route
+          path="/bookmarks"
+          element={
+            <ProtectedRoute>
+              <Bookmarks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/profile"
           element={
             <ProtectedRoute>
@@ -80,10 +108,32 @@ const App = () => (
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/search"
+          element={
+            <ProtectedRoute>
+              <SearchResults />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 404 Page */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </BrowserRouter>
   </AuthProvider>
 );
