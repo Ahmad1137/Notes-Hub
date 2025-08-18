@@ -11,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // serve PDFs/images
-
+app.set("trust proxy", 1);
 // Rate limiter: 200 requests per 15 min per IP
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
