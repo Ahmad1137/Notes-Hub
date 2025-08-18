@@ -42,7 +42,7 @@ export default function Notes() {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  const BACKEND_URL = "http://localhost:5000";
+  const BACKEND_URL = "https://notes-hub-tjkp.onrender.com";
   const token = localStorage.getItem("token");
   const currentUserId = token
     ? JSON.parse(atob(token.split(".")[1])).userId
