@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
+const API = axios.create({
+  baseURL: "https://notes-hub-tjkp.onrender.com/api",
+});
 
 // Attach token automatically
 API.interceptors.request.use((req) => {
