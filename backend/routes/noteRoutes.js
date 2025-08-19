@@ -286,8 +286,9 @@ router.post(
       // If file uploaded, push it to Cloudinary
       if (req.file) {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          resource_type: "raw", // ✅ allows PDF, DOCX, etc.
           folder: "notes-hub",
-          resource_type: "auto", // auto = supports pdf, images, etc
+          // auto = supports pdf, images, etc
         });
 
         fileUrl = uploadResult.secure_url;
