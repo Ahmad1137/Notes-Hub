@@ -8,6 +8,18 @@ const authMiddleware = require("../middleware/auth");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
+const cloudinary = require("../config/cloudinary.js");
+const uploadpdf = multer({ dest: "temp/" });
+
+// Ensure temp directory exists for multer
+try {
+  const tempDir = path.join(__dirname, "../temp");
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Could not ensure temp directory:", e?.message);
+}
 
 // ----------------- helper to read optional token -----------------
 function getUserIdFromHeader(req) {
@@ -23,21 +35,8 @@ function getUserIdFromHeader(req) {
   }
 }
 
-// ----------------- multer (file upload with validation) -----------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
-});
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "application/pdf") cb(null, true);
-  else cb(new Error("Only PDF files are allowed"), false);
-};
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 },
-}); // 10 MB
+// ----------------- multer (legacy local uploads) kept for temp if needed -----------------
+// We now upload to Cloudinary; keep local config only if needed elsewhere
 
 // ----------------- PAGINATED / FILTERED GET /api/notes -----------------
 /*
@@ -208,20 +207,95 @@ router.get("/:id", async (req, res) => {
 
 // ----------------- Upload route (JSON fileUrl) -----------------
 
+// router.post(
+//   "/upload",
+//   authMiddleware,
+//   upload.single("file"), // will handle if file is uploaded; else req.file is undefined
+//   async (req, res) => {
+//     try {
+//       let { title, fileUrl, subject, university, tags, visibility } = req.body;
+
+//       // If a file is uploaded, override fileUrl with uploaded file path
+//       if (req.file) {
+//         fileUrl = `/uploads/${req.file.filename}`;
+//       }
+
+//       // Validate required fields
+//       if (!title || !fileUrl || !subject || !university) {
+//         return res.status(400).json({
+//           message:
+//             "All required fields (title, fileUrl, subject, university) must be filled",
+//         });
+//       }
+
+//       // per-user daily limit check
+//       const dailyLimit = 20;
+//       const today = new Date();
+//       today.setHours(0, 0, 0, 0);
+//       const tomorrow = new Date(today);
+//       tomorrow.setDate(today.getDate() + 1);
+
+//       const countToday = await Note.countDocuments({
+//         uploadedBy: req.user.userId,
+//         createdAt: { $gte: today, $lt: tomorrow },
+//       });
+//       if (countToday >= dailyLimit) {
+//         // If file was uploaded but limit reached, optionally delete file from disk here
+//         return res
+//           .status(429)
+//           .json({ message: `Daily upload limit reached (${dailyLimit})` });
+//       }
+
+//       // Prepare tags array
+//       tags = tags
+//         ? Array.isArray(tags)
+//           ? tags
+//           : tags.split(",").map((t) => t.trim())
+//         : [];
+
+//       const note = new Note({
+//         title,
+//         fileUrl,
+//         subject,
+//         university,
+//         tags,
+//         visibility: visibility || "public",
+//         uploadedBy: req.user.userId,
+//       });
+
+//       await note.save();
+
+//       res.status(201).json({ message: "Note uploaded successfully", note });
+//     } catch (error) {
+//       console.error("Upload Note Error:", error);
+//       res.status(500).json({ message: "Server error" });
+//     }
+//   }
+// );
+
+// keep using multer for temporary file handling
+
 router.post(
   "/upload",
   authMiddleware,
-  upload.single("file"), // will handle if file is uploaded; else req.file is undefined
+  uploadpdf.single("file"),
   async (req, res) => {
     try {
       let { title, fileUrl, subject, university, tags, visibility } = req.body;
 
-      // If a file is uploaded, override fileUrl with uploaded file path
+      // If file uploaded, push it to Cloudinary
       if (req.file) {
-        fileUrl = `/uploads/${req.file.filename}`;
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          folder: "notes-hub",
+          resource_type: "auto", // auto = supports pdf, images, etc
+        });
+
+        fileUrl = uploadResult.secure_url;
+
+        // remove temp file
+        fs.unlinkSync(req.file.path);
       }
 
-      // Validate required fields
       if (!title || !fileUrl || !subject || !university) {
         return res.status(400).json({
           message:
@@ -229,7 +303,7 @@ router.post(
         });
       }
 
-      // per-user daily limit check
+      // daily upload limit check
       const dailyLimit = 20;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -241,13 +315,12 @@ router.post(
         createdAt: { $gte: today, $lt: tomorrow },
       });
       if (countToday >= dailyLimit) {
-        // If file was uploaded but limit reached, optionally delete file from disk here
         return res
           .status(429)
           .json({ message: `Daily upload limit reached (${dailyLimit})` });
       }
 
-      // Prepare tags array
+      // process tags
       tags = tags
         ? Array.isArray(tags)
           ? tags
@@ -275,65 +348,60 @@ router.post(
 );
 
 // ----------------- EDIT NOTE -----------------
-router.put("/:id", authMiddleware, upload.single("file"), async (req, res) => {
-  try {
-    const note = await Note.findById(req.params.id);
-    if (!note) return res.status(404).json({ message: "Note not found" });
-    if (note.uploadedBy.toString() !== req.user.userId)
-      return res.status(403).json({ message: "You cannot edit this note" });
+router.put(
+  "/:id",
+  authMiddleware,
+  uploadpdf.single("file"),
+  async (req, res) => {
+    try {
+      const note = await Note.findById(req.params.id);
+      if (!note) return res.status(404).json({ message: "Note not found" });
+      if (note.uploadedBy.toString() !== req.user.userId)
+        return res.status(403).json({ message: "You cannot edit this note" });
 
-    // Destructure from req.body (text fields)
-    const { title, subject, university, tags, visibility, commentsEnabled } =
-      req.body;
+      // Destructure from req.body (text fields)
+      const { title, subject, university, tags, visibility, commentsEnabled } =
+        req.body;
 
-    // Update text fields if provided
-    note.title = title || note.title;
-    note.subject = subject || note.subject;
-    note.university = university || note.university;
-    note.visibility = visibility || note.visibility;
-    if (typeof commentsEnabled === "boolean")
-      note.commentsEnabled = commentsEnabled;
+      // Update text fields if provided
+      note.title = title || note.title;
+      note.subject = subject || note.subject;
+      note.university = university || note.university;
+      note.visibility = visibility || note.visibility;
+      if (typeof commentsEnabled === "boolean")
+        note.commentsEnabled = commentsEnabled;
 
-    // Parse tags if provided as string
-    if (tags) {
-      note.tags = Array.isArray(tags)
-        ? tags
-        : tags.split(",").map((t) => t.trim());
-    }
-
-    // Handle file upload and update fileUrl
-    if (req.file) {
-      // Delete old file safely if exists
-      if (note.fileUrl) {
-        const oldFilePath = path.join(
-          __dirname,
-          "../uploads",
-          path.basename(note.fileUrl)
-        );
-        fs.access(oldFilePath, fs.constants.F_OK, (err) => {
-          if (!err) {
-            fs.unlink(oldFilePath, (err) => {
-              if (err) console.error("Failed to delete old file:", err);
-            });
-          }
-        });
+      // Parse tags if provided as string
+      if (tags) {
+        note.tags = Array.isArray(tags)
+          ? tags
+          : tags.split(",").map((t) => t.trim());
       }
 
-      // Update note.fileUrl to new file path
-      note.fileUrl = `/uploads/${req.file.filename}`;
-    } else if (req.body.fileUrl) {
-      // Optional: If frontend wants to update fileUrl without upload
-      note.fileUrl = req.body.fileUrl;
+      // Handle file upload and update fileUrl using Cloudinary
+      if (req.file) {
+        // Upload new file to cloudinary
+        const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          folder: "notes-hub",
+          resource_type: "auto",
+        });
+        note.fileUrl = uploadResult.secure_url;
+        // remove temp file
+        fs.unlink(req.file.path, () => {});
+      } else if (req.body.fileUrl) {
+        // Optional: If frontend wants to update fileUrl without upload
+        note.fileUrl = req.body.fileUrl;
+      }
+
+      await note.save();
+
+      res.json({ message: "Note updated", note });
+    } catch (err) {
+      console.error("Edit Note Error:", err);
+      res.status(500).json({ message: "Server error" });
     }
-
-    await note.save();
-
-    res.json({ message: "Note updated", note });
-  } catch (err) {
-    console.error("Edit Note Error:", err);
-    res.status(500).json({ message: "Server error" });
   }
-});
+);
 
 // ----------------- DELETE NOTE -----------------
 router.delete("/:id", authMiddleware, async (req, res) => {

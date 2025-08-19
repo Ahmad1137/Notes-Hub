@@ -3,22 +3,17 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const multer = require("multer");
+const cloudinary = require("../config/cloudinary.js");
 const User = require("../models/User");
 const Note = require("../models/Note");
 const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
-// ================== Multer Storage for Profile Pics ==================
-const profileStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
-});
-
+// ================== Multer temp storage for Profile Pics (Cloudinary) ==================
 const profileUpload = multer({
-  storage: profileStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB limit
+  dest: "temp/",
+  limits: { fileSize: 2 * 1024 * 1024 },
 });
 
 // ================== REGISTER ==================
@@ -100,7 +95,18 @@ router.put(
       user.address = address || user.address;
 
       if (req.file) {
-        user.profilePic = `/uploads/${req.file.filename}`;
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "notes-hub/profile",
+          resource_type: "image",
+          transformation: [
+            { width: 256, height: 256, crop: "fill", gravity: "face" },
+          ],
+        });
+        user.profilePic = result.secure_url;
+        // cleanup temp file
+        try {
+          require("fs").unlinkSync(req.file.path);
+        } catch (e) {}
       }
 
       await user.save();
