@@ -285,7 +285,7 @@ export default function Notes() {
 
           <div className="flex items-center space-x-2">
             <a
-              href={note.fileUrl}
+              href={getFileUrl(note.fileUrl)}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary text-sm"
