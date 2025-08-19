@@ -290,15 +290,26 @@ router.post(
 
       // If file uploaded, push it to Cloudinary
       if (req.file) {
+        // Ensure the file is a PDF
+        if (req.file.mimetype !== "application/pdf") {
+          return res
+            .status(400)
+            .json({ message: "Only PDF files are allowed" });
+        }
+
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "notes-hub",
-          resource_type: "raw",
-          public_id: Date.now().toString(),
-          format: "pdf", // 👈 ensures proper extension for iframe
+          resource_type: "raw", // Explicitly set to raw for PDFs
+          public_id: `pdf_${Date.now()}`, // Unique public_id for clarity
         });
 
-        fileUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload/v${uploadResult.version}/${uploadResult.public_id}.pdf`;
+        // Construct the correct raw URL for PDF
+        fileUrl = uploadResult.secure_url.replace(
+          "/image/upload/",
+          "/raw/upload/"
+        );
 
+        // Clean up temporary file
         fs.unlinkSync(req.file.path);
       }
 
@@ -309,7 +320,7 @@ router.post(
         });
       }
 
-      // daily upload limit check
+      // Daily upload limit check
       const dailyLimit = 20;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -326,7 +337,7 @@ router.post(
           .json({ message: `Daily upload limit reached (${dailyLimit})` });
       }
 
-      // process tags
+      // Process tags
       tags = tags
         ? Array.isArray(tags)
           ? tags
