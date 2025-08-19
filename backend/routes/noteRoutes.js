@@ -275,81 +275,6 @@ router.get("/:id", async (req, res) => {
 
 // keep using multer for temporary file handling
 
-// router.post(
-//   "/upload",
-//   authMiddleware,
-//   uploadpdf.single("file"),
-//   async (req, res) => {
-//     try {
-//       let { title, fileUrl, subject, university, tags, visibility } = req.body;
-
-//       // If file uploaded, push it to Cloudinary
-//       if (req.file) {
-//         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-//           folder: "notes-hub",
-//           resource_type: "auto", // 👈 auto-detects (PDF, image, etc.)
-//           format: "pdf", // 👈 ensures proper extension for iframe
-//         });
-
-//         fileUrl = uploadResult.secure_url;
-
-//         // remove temp file
-//         fs.unlinkSync(req.file.path);
-//       }
-
-//       if (!title || !fileUrl || !subject || !university) {
-//         return res.status(400).json({
-//           message:
-//             "All required fields (title, fileUrl, subject, university) must be filled",
-//         });
-//       }
-
-//       // daily upload limit check
-//       const dailyLimit = 20;
-//       const today = new Date();
-//       today.setHours(0, 0, 0, 0);
-//       const tomorrow = new Date(today);
-//       tomorrow.setDate(today.getDate() + 1);
-
-//       const countToday = await Note.countDocuments({
-//         uploadedBy: req.user.userId,
-//         createdAt: { $gte: today, $lt: tomorrow },
-//       });
-//       if (countToday >= dailyLimit) {
-//         return res
-//           .status(429)
-//           .json({ message: `Daily upload limit reached (${dailyLimit})` });
-//       }
-
-//       // process tags
-//       tags = tags
-//         ? Array.isArray(tags)
-//           ? tags
-//           : tags.split(",").map((t) => t.trim())
-//         : [];
-
-//       const note = new Note({
-//         title,
-//         fileUrl,
-//         subject,
-//         university,
-//         tags,
-//         visibility: visibility || "public",
-//         uploadedBy: req.user.userId,
-//       });
-
-//       await note.save();
-
-//       res.status(201).json({ message: "Note uploaded successfully", note });
-//     } catch (error) {
-//       console.error("Upload Note Error:", error);
-//       res.status(500).json({ message: "Server error" });
-//     }
-//   }
-// );
-
-// ----------------- EDIT NOTE -----------------
-
 router.post(
   "/upload",
   authMiddleware,
@@ -362,13 +287,13 @@ router.post(
       if (req.file) {
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "notes-hub",
-          resource_type: "auto", // ✅ auto handles PDF & images
-          format: "pdf", // ✅ forces .pdf extension
+          resource_type: "raw",
+          public_id: Date.now().toString(),
+          format: "pdf", // 👈 ensures proper extension for iframe
         });
 
-        fileUrl = uploadResult.secure_url;
+        fileUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload/v${uploadResult.version}/${uploadResult.public_id}.pdf`;
 
-        // remove temp file
         fs.unlinkSync(req.file.path);
       }
 
@@ -423,6 +348,7 @@ router.post(
   }
 );
 
+// ----------------- EDIT NOTE -----------------
 router.put(
   "/:id",
   authMiddleware,
