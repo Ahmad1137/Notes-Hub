@@ -9,8 +9,13 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const cloudinary = require("../config/cloudinary.js");
-const uploadpdf = multer({ dest: "temp/" });
-
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "temp/"),
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // keep .pdf, .jpg, etc
+  },
+});
+const uploadpdf = multer({ storage });
 // Ensure temp directory exists for multer
 try {
   const tempDir = path.join(__dirname, "../temp");
