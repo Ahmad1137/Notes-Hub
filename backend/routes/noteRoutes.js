@@ -290,24 +290,15 @@ router.post(
 
       // If file uploaded, push it to Cloudinary
       if (req.file) {
-        // Ensure the file is a PDF
-        if (req.file.mimetype !== "application/pdf") {
-          return res
-            .status(400)
-            .json({ message: "Only PDF files are allowed" });
-        }
-
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "notes-hub",
-          resource_type: "raw", // Explicitly set to raw for PDFs
-          public_id: `pdf_${Date.now()}`, // Unique public_id for clarity
+          resource_type: "raw",
+          use_filename: true,
+          unique_filename: false,
         });
 
-        // Construct the correct raw URL for PDF
-        fileUrl = uploadResult.secure_url.replace(
-          "/image/upload/",
-          "/raw/upload/"
-        );
+        // Use the secure_url provided by Cloudinary
+        fileUrl = uploadResult.secure_url;
 
         // Clean up temporary file
         fs.unlinkSync(req.file.path);
@@ -400,7 +391,7 @@ router.put(
         // Upload new file to cloudinary
         const uploadResult = await cloudinary.uploader.upload(req.file.path, {
           folder: "notes-hub",
-          resource_type: "auto",
+          resource_type: "raw",
         });
         note.fileUrl = uploadResult.secure_url;
         // remove temp file
