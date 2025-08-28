@@ -8,24 +8,57 @@ import {
   FaEye,
   FaEyeSlash,
   FaGraduationCap,
+  FaExclamationCircle,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { validateForm, sanitizeInput } from "../utils/validation";
 import "../index.css";
 
 const LoginPage = () => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const sanitizedValue = sanitizeInput(value);
+    setForm({ ...form, [name]: sanitizedValue });
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    setTouched({ ...touched, [name]: true });
+    
+    // Validate field on blur
+    const validation = validateForm({ [name]: form[name], password: form.password, email: form.email }, 'login');
+    if (validation.errors[name]) {
+      setErrors({ ...errors, [name]: validation.errors[name] });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    const validation = validateForm(form, 'login');
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      setTouched({ email: true, password: true });
+      toast.error('Please fix the form errors');
+      return;
+    }
+
     setLoading(true);
+    setErrors({});
 
     try {
       const res = await loginUser(form);
@@ -33,10 +66,21 @@ const LoginPage = () => {
       toast.success("Welcome back!");
       navigate("/");
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          "Login failed. Please check your credentials."
-      );
+      const errorMessage = err.response?.data?.message || "Login failed. Please check your credentials.";
+      toast.error(errorMessage);
+      
+      // Set server errors
+      if (err.response?.data?.errors) {
+        const serverErrors = {};
+        err.response.data.errors.forEach(error => {
+          if (error.includes('email') || error.includes('Email')) {
+            serverErrors.email = error;
+          } else if (error.includes('password') || error.includes('Password')) {
+            serverErrors.password = error;
+          }
+        });
+        setErrors(serverErrors);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,11 +119,18 @@ const LoginPage = () => {
                   name="email"
                   value={form.email}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${errors.email && touched.email ? 'border-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your email"
                 />
               </div>
+              {errors.email && touched.email && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.email}</span>
+                </div>
+              )}
             </div>
 
             {/* Password Field */}
@@ -96,8 +147,9 @@ const LoginPage = () => {
                   name="password"
                   value={form.password}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10 pr-10"
+                  className={`input-field pl-10 pr-10 ${errors.password && touched.password ? 'border-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your password"
                 />
                 <button
@@ -112,6 +164,12 @@ const LoginPage = () => {
                   )}
                 </button>
               </div>
+              {errors.password && touched.password && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.password}</span>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

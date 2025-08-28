@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import { getProfile, updateProfile } from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
+import { toast } from "react-toastify";
 
 const Profile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -13,6 +16,7 @@ const Profile = () => {
     address: "",
     profilePic: null,
   });
+  const { updateUser } = useAuth();
 
   // Fetch profile on mount
   useEffect(() => {
@@ -30,6 +34,7 @@ const Profile = () => {
         setImagePreview(data.profilePic || null);
       } catch (err) {
         console.error("Error fetching profile:", err);
+        toast.error("Failed to load profile");
       } finally {
         setLoading(false);
       }
@@ -52,6 +57,8 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setUpdating(true);
+    
     try {
       const form = new FormData();
       form.append("name", formData.name);
@@ -62,11 +69,24 @@ const Profile = () => {
       }
 
       const { data } = await updateProfile(form);
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setProfile(data.user);
+      
+      // Update user in context with new profile picture
+      updateUser({
+        ...data.user,
+        profilePic: data.user.profilePic
+      });
+      
+      // Update image preview with new profile picture
+      if (data.user.profilePic) {
+        setImagePreview(data.user.profilePic);
+      }
     } catch (err) {
       console.error("Error updating profile:", err);
-      alert("Error updating profile.");
+      toast.error("Failed to update profile. Please try again.");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -148,9 +168,17 @@ const Profile = () => {
           {/* Save Button */}
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700"
+            disabled={updating}
+            className="bg-blue-600 text-white px-4 py-2 rounded w-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            Save Changes
+            {updating ? (
+              <>
+                <div className="loading-spinner mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </button>
         </form>
       </div>

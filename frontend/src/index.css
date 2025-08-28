@@ -37,6 +37,44 @@
   .loading-spinner {
     @apply animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600;
   }
+
+  /* Validation Styles */
+  .input-field.error {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-200;
+  }
+
+  .input-field.success {
+    @apply border-green-500 focus:border-green-500 focus:ring-green-200;
+  }
+
+  .error-message {
+    @apply flex items-center mt-1 text-red-600 text-sm;
+  }
+
+  .success-message {
+    @apply flex items-center mt-1 text-green-600 text-sm;
+  }
+
+  /* Password Strength Indicator */
+  .password-strength {
+    @apply mt-2 p-3 bg-gray-50 rounded-lg;
+  }
+
+  .strength-weak {
+    @apply text-red-500;
+  }
+
+  .strength-medium {
+    @apply text-yellow-500;
+  }
+
+  .strength-strong {
+    @apply text-green-500;
+  }
+
+  .loading-spinner-large {
+    @apply animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600;
+  }
 }
 
 @layer utilities {
@@ -46,5 +84,21 @@
 
   .glass-effect {
     @apply backdrop-blur-sm bg-white/80 border border-white/20;
+  }
+
+  /* Form validation animations */
+  .shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  /* Loading states */
+  .btn-loading {
+    @apply opacity-75 cursor-not-allowed;
   }
 }

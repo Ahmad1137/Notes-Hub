@@ -16,20 +16,87 @@ const profileUpload = multer({
   limits: { fileSize: 2 * 1024 * 1024 },
 });
 
+// ================== VALIDATION HELPERS ==================
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+  // At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special char
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+};
+
+const validatePhone = (phone) => {
+  const phoneRegex = /^[\+]?[1-9][\d]{0,2}[\s\-]?[\(]?[\d]{1,4}[\)]?[\s\-]?[\d]{1,4}[\s\-]?[\d]{1,9}$/;
+  return phoneRegex.test(phone);
+};
+
+const sanitizeInput = (input) => {
+  if (typeof input !== 'string') return input;
+  return input.trim().replace(/\s+/g, ' ');
+};
+
 // ================== REGISTER ==================
 router.post("/register", async (req, res) => {
-  const { name, email, password, phone_no, address } = req.body;
+  let { name, email, password, phone_no, address } = req.body;
 
   try {
-    const exists = await User.findOne({ email });
+    // Sanitize inputs
+    name = sanitizeInput(name);
+    email = sanitizeInput(email);
+    phone_no = sanitizeInput(phone_no);
+    address = sanitizeInput(address);
+
+    // Validation
+    const errors = [];
+
+    if (!name || name.length < 2) {
+      errors.push("Name must be at least 2 characters long");
+    }
+    if (name && name.length > 50) {
+      errors.push("Name must be less than 50 characters");
+    }
+
+    if (!email) {
+      errors.push("Email is required");
+    } else if (!validateEmail(email)) {
+      errors.push("Please enter a valid email address");
+    }
+
+    if (!password) {
+      errors.push("Password is required");
+    } else if (!validatePassword(password)) {
+      errors.push("Password must be at least 8 characters with uppercase, lowercase, number and special character");
+    }
+
+    if (!phone_no) {
+      errors.push("Phone number is required");
+    } else if (!validatePhone(phone_no)) {
+      errors.push("Please enter a valid phone number");
+    }
+
+    if (!address || address.length < 5) {
+      errors.push("Address must be at least 5 characters long");
+    }
+    if (address && address.length > 200) {
+      errors.push("Address must be less than 200 characters");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors[0], errors });
+    }
+
+    const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists)
       return res.status(400).json({ message: "Email already exists" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = new User({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       phone_no,
       address,
@@ -46,14 +113,36 @@ router.post("/register", async (req, res) => {
 
 // ================== LOGIN ==================
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    // Sanitize inputs
+    email = sanitizeInput(email);
+
+    // Validation
+    const errors = [];
+
+    if (!email) {
+      errors.push("Email is required");
+    } else if (!validateEmail(email)) {
+      errors.push("Please enter a valid email address");
+    }
+
+    if (!password) {
+      errors.push("Password is required");
+    } else if (password.length < 6) {
+      errors.push("Password must be at least 6 characters long");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors[0], errors });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(400).json({ message: "Invalid email or password" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ message: "Invalid credentials" });
+    if (!match) return res.status(400).json({ message: "Invalid email or password" });
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",

@@ -42,7 +42,7 @@ export const createComment = (noteId, text) =>
 export const getCommentsNotes = (id) => API.get(`/notes/${id}/comments`);
 export const createBookmark = (id, data) =>
   API.post(`/notes/${id}/bookmark`, data);
-export const removeBookmark = (id) => API.delete(`/notes/${id}/bookmark`);
+export const removeBookmark = (id) => API.post(`/notes/${id}/bookmark`);
 export const getBookmarks = () => API.get("/notes/bookmarks/me");
 export const searchNotes = async (query) => {
   try {

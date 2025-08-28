@@ -10,8 +10,12 @@ import {
   FaPhone,
   FaMapMarkerAlt,
   FaGraduationCap,
+  FaExclamationCircle,
+  FaCheck,
+  FaTimes,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { validateForm, sanitizeInput, getPasswordStrength } from "../utils/validation";
 
 const RegisterPage = () => {
   const [form, setForm] = useState({
@@ -23,27 +27,126 @@ const RegisterPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, checks: {}, strength: 'weak' });
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const sanitizedValue = sanitizeInput(value);
+    setForm({ ...form, [name]: sanitizedValue });
+    
+    // Update password strength in real-time
+    if (name === 'password') {
+      setPasswordStrength(getPasswordStrength(sanitizedValue));
+    }
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    setTouched({ ...touched, [name]: true });
+    
+    // Validate field on blur
+    const validation = validateForm(form, 'register');
+    if (validation.errors[name]) {
+      setErrors({ ...errors, [name]: validation.errors[name] });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    const validation = validateForm(form, 'register');
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      setTouched({ name: true, email: true, password: true, phone_no: true, address: true });
+      toast.error('Please fix the form errors');
+      return;
+    }
+
     setLoading(true);
+    setErrors({});
 
     try {
       await registerUser(form);
       toast.success("Registration successful! Redirecting to login...");
       setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Registration failed. Please try again."
-      );
+      const errorMessage = err.response?.data?.message || "Registration failed. Please try again.";
+      toast.error(errorMessage);
+      
+      // Set server errors
+      if (err.response?.data?.errors) {
+        const serverErrors = {};
+        err.response.data.errors.forEach(error => {
+          if (error.includes('Name') || error.includes('name')) {
+            serverErrors.name = error;
+          } else if (error.includes('Email') || error.includes('email')) {
+            serverErrors.email = error;
+          } else if (error.includes('Password') || error.includes('password')) {
+            serverErrors.password = error;
+          } else if (error.includes('Phone') || error.includes('phone')) {
+            serverErrors.phone_no = error;
+          } else if (error.includes('Address') || error.includes('address')) {
+            serverErrors.address = error;
+          }
+        });
+        setErrors(serverErrors);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const PasswordStrengthIndicator = () => {
+    const { checks, strength } = passwordStrength;
+    const strengthColors = {
+      weak: 'text-red-500',
+      medium: 'text-yellow-500',
+      strong: 'text-green-500'
+    };
+
+    if (!form.password) return null;
+
+    return (
+      <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Password Strength:</span>
+          <span className={`text-sm font-medium ${strengthColors[strength]}`}>
+            {strength.charAt(0).toUpperCase() + strength.slice(1)}
+          </span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className={`flex items-center ${checks.length ? 'text-green-600' : 'text-gray-400'}`}>
+            {checks.length ? <FaCheck className="w-3 h-3 mr-1" /> : <FaTimes className="w-3 h-3 mr-1" />}
+            At least 8 characters
+          </div>
+          <div className={`flex items-center ${checks.uppercase ? 'text-green-600' : 'text-gray-400'}`}>
+            {checks.uppercase ? <FaCheck className="w-3 h-3 mr-1" /> : <FaTimes className="w-3 h-3 mr-1" />}
+            One uppercase letter
+          </div>
+          <div className={`flex items-center ${checks.lowercase ? 'text-green-600' : 'text-gray-400'}`}>
+            {checks.lowercase ? <FaCheck className="w-3 h-3 mr-1" /> : <FaTimes className="w-3 h-3 mr-1" />}
+            One lowercase letter
+          </div>
+          <div className={`flex items-center ${checks.number ? 'text-green-600' : 'text-gray-400'}`}>
+            {checks.number ? <FaCheck className="w-3 h-3 mr-1" /> : <FaTimes className="w-3 h-3 mr-1" />}
+            One number
+          </div>
+          <div className={`flex items-center ${checks.special ? 'text-green-600' : 'text-gray-400'}`}>
+            {checks.special ? <FaCheck className="w-3 h-3 mr-1" /> : <FaTimes className="w-3 h-3 mr-1" />}
+            One special character (@$!%*?&)
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -79,11 +182,18 @@ const RegisterPage = () => {
                   name="name"
                   value={form.name}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${errors.name && touched.name ? 'border-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your full name"
                 />
               </div>
+              {errors.name && touched.name && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.name}</span>
+                </div>
+              )}
             </div>
 
             {/* Email Field */}
@@ -100,11 +210,18 @@ const RegisterPage = () => {
                   name="email"
                   value={form.email}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${errors.email && touched.email ? 'border-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your email"
                 />
               </div>
+              {errors.email && touched.email && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.email}</span>
+                </div>
+              )}
             </div>
 
             {/* Password Field */}
@@ -121,10 +238,10 @@ const RegisterPage = () => {
                   name="password"
                   value={form.password}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  minLength={6}
-                  className="input-field pl-10 pr-10"
-                  placeholder="Create a password (min 6 characters)"
+                  className={`input-field pl-10 pr-10 ${errors.password && touched.password ? 'border-red-500 focus:border-red-500' : ''}`}
+                  placeholder="Create a strong password"
                 />
                 <button
                   type="button"
@@ -138,6 +255,13 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
+              {errors.password && touched.password && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.password}</span>
+                </div>
+              )}
+              <PasswordStrengthIndicator />
             </div>
 
             {/* Phone Field */}
@@ -154,11 +278,18 @@ const RegisterPage = () => {
                   name="phone_no"
                   value={form.phone_no}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10"
-                  placeholder="Enter your phone number"
+                  className={`input-field pl-10 ${errors.phone_no && touched.phone_no ? 'border-red-500 focus:border-red-500' : ''}`}
+                  placeholder="Enter your phone number start with +92"
                 />
               </div>
+              {errors.phone_no && touched.phone_no && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.phone_no}</span>
+                </div>
+              )}
             </div>
 
             {/* Address Field */}
@@ -175,11 +306,18 @@ const RegisterPage = () => {
                   name="address"
                   value={form.address}
                   onChange={handleChange}
+                  onBlur={handleBlur}
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${errors.address && touched.address ? 'border-red-500 focus:border-red-500' : ''}`}
                   placeholder="Enter your address"
                 />
               </div>
+              {errors.address && touched.address && (
+                <div className="flex items-center mt-1 text-red-600 text-sm">
+                  <FaExclamationCircle className="w-4 h-4 mr-1" />
+                  <span>{errors.address}</span>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

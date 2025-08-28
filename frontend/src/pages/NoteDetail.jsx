@@ -34,6 +34,8 @@ const NoteDetail = () => {
   const [loading, setLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [userVote, setUserVote] = useState(null);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [commentLoading, setCommentLoading] = useState(false);
 
   useEffect(() => {
     fetchNoteDetails();
@@ -78,6 +80,7 @@ const NoteDetail = () => {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
+    setCommentLoading(true);
 
     try {
       const { data: newC } = await createComment(id, newComment);
@@ -88,17 +91,22 @@ const NoteDetail = () => {
     } catch (error) {
       console.error("Error adding comment:", error);
       toast.error("Failed to add comment");
+    } finally {
+      setCommentLoading(false);
     }
   };
 
   const handleBookmark = async () => {
+    setBookmarkLoading(true);
     try {
       await createBookmark(id, {});
-      setIsBookmarked(true);
-      toast.success("Note bookmarked successfully");
+      setIsBookmarked(!isBookmarked);
+      toast.success(isBookmarked ? "Bookmark removed" : "Note bookmarked successfully");
     } catch (error) {
       console.error("Error bookmarking note:", error);
       toast.error("Failed to bookmark note");
+    } finally {
+      setBookmarkLoading(false);
     }
   };
 
@@ -282,10 +290,17 @@ const NoteDetail = () => {
                       </div>
                       <button
                         onClick={handleAddComment}
-                        disabled={!newComment.trim()}
-                        className="btn-primary self-end disabled:opacity-50"
+                        disabled={!newComment.trim() || commentLoading}
+                        className="btn-primary self-end disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                       >
-                        Post
+                        {commentLoading ? (
+                          <>
+                            <div className="loading-spinner mr-2 w-4 h-4"></div>
+                            Posting...
+                          </>
+                        ) : (
+                          "Post"
+                        )}
                       </button>
                     </div>
                   </div>
@@ -365,12 +380,22 @@ const NoteDetail = () => {
                   {user && (
                     <button
                       onClick={handleBookmark}
-                      className={`w-full flex items-center justify-center ${
+                      disabled={bookmarkLoading}
+                      className={`w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
                         isBookmarked ? "btn-danger" : "btn-secondary"
                       }`}
                     >
-                      <FaBookmark className="w-4 h-4 mr-2" />
-                      {isBookmarked ? "Remove Bookmark" : "Add Bookmark"}
+                      {bookmarkLoading ? (
+                        <>
+                          <div className="loading-spinner mr-2 w-4 h-4"></div>
+                          {isBookmarked ? "Removing..." : "Adding..."}
+                        </>
+                      ) : (
+                        <>
+                          <FaBookmark className="w-4 h-4 mr-2" />
+                          {isBookmarked ? "Remove Bookmark" : "Add Bookmark"}
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

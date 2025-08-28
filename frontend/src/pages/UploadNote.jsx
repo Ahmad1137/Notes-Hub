@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import React, { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { uploadNote, editNote } from "../services/api";
+import { toast } from "react-toastify";
 import Layout from "../components/Layout";
 
 export default function UploadNote() {
@@ -51,19 +52,18 @@ export default function UploadNote() {
       if (file) formData.append("file", file);
 
       if (editingNote) {
-        // Edit mode: call editNote API
-        // Assume editNote accepts (id, formData, token)
         await editNote(editingNote._id, formData, token);
+        toast.success("Note updated successfully!");
       } else {
-        // New upload
         await uploadNote(formData, token);
+        toast.success("Note uploaded successfully!");
       }
 
       navigate("/my-notes");
     } catch (err) {
-      setError(
-        err.response?.data?.message || err.message || "Failed to submit"
-      );
+      const errorMessage = err.response?.data?.message || err.message || "Failed to submit";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -135,15 +135,16 @@ export default function UploadNote() {
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {loading
-              ? editingNote
-                ? "Updating..."
-                : "Uploading..."
-              : editingNote
-              ? "Update Note"
-              : "Upload Note"}
+            {loading ? (
+              <>
+                <div className="loading-spinner mr-2"></div>
+                {editingNote ? "Updating..." : "Uploading..."}
+              </>
+            ) : (
+              editingNote ? "Update Note" : "Upload Note"
+            )}
           </button>
         </form>
       </div>

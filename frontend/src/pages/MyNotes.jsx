@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // <-- Import Link here
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout";
-
+import { toast } from "react-toastify";
 import {
   getMyNotes,
   deleteNote as apiDeleteNote,
   editNote,
-} from "../services/api"; // rename import to avoid clash
+} from "../services/api";
 import {
   FaFilePdf,
   FaUser,
@@ -19,7 +19,8 @@ import {
 export default function MyNotes() {
   const navigate = useNavigate();
   const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(true); // <-- loading state
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -30,6 +31,7 @@ export default function MyNotes() {
         setNotes(res.data); // adjust if API response differs
       } catch (err) {
         console.error("Error fetching my notes:", err);
+        toast.error("Failed to load notes");
         setNotes([]);
       }
       setLoading(false);
@@ -38,15 +40,18 @@ export default function MyNotes() {
     fetchNotes();
   }, []);
 
-  // Local deleteNote function that calls your API helper
   const deleteNote = async (id) => {
     if (!window.confirm("Are you sure you want to delete this note?")) return;
+    setDeleting(id);
     try {
-      await apiDeleteNote(id); // call API to delete
-      setNotes(notes.filter((note) => note._id !== id)); // update UI
+      await apiDeleteNote(id);
+      setNotes(notes.filter((note) => note._id !== id));
+      toast.success("Note deleted successfully");
     } catch (err) {
       console.error("Failed to delete note:", err);
-      alert("Failed to delete note. Try again.");
+      toast.error("Failed to delete note. Please try again.");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -113,10 +118,18 @@ export default function MyNotes() {
                   </Link>
                   <button
                     onClick={() => deleteNote(note._id)}
-                    className="text-red-600 hover:text-red-800 font-semibold"
+                    disabled={deleting === note._id}
+                    className="text-red-600 hover:text-red-800 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                     type="button"
                   >
-                    Delete
+                    {deleting === note._id ? (
+                      <>
+                        <div className="loading-spinner mr-1 w-3 h-3"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete"
+                    )}
                   </button>
                   <button
                     type="button"

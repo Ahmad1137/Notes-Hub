@@ -107,8 +107,18 @@ export default function Navbar() {
                 {/* User Menu */}
                 <div className="relative group ml-2">
                   <button className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors duration-200">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                      <FaUser className="w-4 h-4 text-primary-600" />
+                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary-200">
+                      {user.profilePic ? (
+                        <img 
+                          src={user.profilePic} 
+                          alt={user.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-primary-100 flex items-center justify-center">
+                          <FaUser className="w-4 h-4 text-primary-600" />
+                        </div>
+                      )}
                     </div>
                     <span className="font-medium">{user.name}</span>
                   </button>
